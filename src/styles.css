@@ -1,0 +1,6 @@
+html,body { background: #0b0b0b; color: #eaeaea; font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+a { color: #5ae59a }
+button { background:#151515; color:#eaeaea; border:1px solid #3a3a3a; border-radius:6px; cursor:pointer }
+button:hover { border-color:#5ae59a }
+input { background:#151515; color:#eaeaea; border:1px solid #3a3a3a; border-radius:6px }
+label { font-size:12px; color:#9aa0a6 }
