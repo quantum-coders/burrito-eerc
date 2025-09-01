@@ -63,7 +63,6 @@ export const wagmiConfig = createConfig({
 
 if (typeof window !== "undefined") {
   console.log("[wagmi] config ready, connectors:",
-    // @ts-expect-error debug
     (wagmiConfig.connectors ?? []).map(c => ({ id: c.id, name: c.name }))
   );
 }

@@ -5,18 +5,18 @@ import {
   useConnectors,
   useDisconnect,
   useSwitchChain,
-  useChains,
 } from "wagmi";
 import { avalanche } from "wagmi/chains";
 
 export function ConnectWalletBar() {
   const { address, isConnected, connector } = useAccount();
   const { disconnectAsync } = useDisconnect();
-  const { connectors, isLoading: loadingConnectors } = useConnectors();
+
+  const connectors = useConnectors();                // <- array
   const { connectAsync, status, error } = useConnect();
-  const { chains } = useChains();
   const { switchChainAsync } = useSwitchChain();
 
+  const loadingConnectors = connectors.length === 0 && status === "idle";
   // Helpful logs
   useEffect(() => {
     // eslint-disable-next-line no-console
