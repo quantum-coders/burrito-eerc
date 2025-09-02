@@ -1,43 +1,36 @@
 // src/pages/_app.tsx
-import type { AppProps } from "next/app";
-import { WagmiProvider } from "wagmi";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ToastContainer } from "react-toastify";
-import { wagmiConfig } from "@/lib/wagmi";
-import "react-toastify/dist/ReactToastify.css";
-import "@/styles/globals.css"; // <- te doy este archivo en el punto 5
+import type { AppProps } from 'next/app'
+import Head from 'next/head'
+import dynamic from 'next/dynamic'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { wagmiConfig } from '../lib/wagmi'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import '../styles/globals.css'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      retryDelay: (i) => Math.min(1000 * 2 ** i, 30000),
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// ⬇️ Load modal only on client to avoid any SSR 'window' surprises.
+const WalletModalRoot = dynamic(() => import('../components/WalletModalRoot'), {
+  ssr: false,
+})
 
-export default function App({ Component, pageProps }: AppProps) {
+const queryClient = new QueryClient()
+
+export default function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <Component {...pageProps} />
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          newestOnTop
-          closeOnClick
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="dark"
-          style={{
-            fontSize: "13px",
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-          }}
-        />
-      </QueryClientProvider>
-    </WagmiProvider>
-  );
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Burrito — Private Wallet</title>
+      </Head>
+
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <Component {...pageProps} />
+          <WalletModalRoot />
+          <ToastContainer position="bottom-right" theme="dark" autoClose={3000} newestOnTop />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </>
+  )
 }

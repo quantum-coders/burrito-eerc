@@ -1,68 +1,48 @@
 // src/lib/wagmi.ts
-/* eslint-disable no-console */
-import { createConfig, http } from "wagmi";
-import { avalanche } from "wagmi/chains";
-import {
-  injected,
-  metaMask,
-  coinbaseWallet,
-  walletConnect,
-} from "wagmi/connectors";
+import { createConfig, http } from 'wagmi'
+import { avalanche } from 'wagmi/chains'
+import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
-const RPC_URL = process.env.NEXT_PUBLIC_AVAX_RPC || "https://api.avax.network/ext/bc/C/rpc";
-const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
+const wcProjectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID
 
-// Exigimos WalletConnect por robustez (iframes / mobile)
-if (!WC_PROJECT_ID) {
-  console.error(
-    "[wagmi] NEXT_PUBLIC_WC_PROJECT_ID is missing. WalletConnect QR will NOT work (required for iframe/mobile)."
-  );
-}
+const connectors = [
+	injected({ shimDisconnect: true }),
+	coinbaseWallet({
+		appName: 'Burrito — Private Wallet',
+		appLogoUrl:
+			typeof window !== 'undefined'
+				? `${ window.location.origin }/favicon.ico`
+				: undefined,
+	}),
+	...(wcProjectId
+		? [
+			walletConnect({
+				projectId: wcProjectId,
+				showQrModal: true,
+				metadata: {
+					name: 'Burrito — Private Wallet',
+					description: 'Encrypted ERC-20 on Avalanche',
+					url:
+						typeof window !== 'undefined'
+							? window.location.origin
+							: 'https://example.org',
+					icons: [
+						typeof window !== 'undefined'
+							? `${ window.location.origin }/favicon.ico`
+							: 'https://walletconnect.com/_next/static/media/walletconnect-logo.1c6b3f2a.svg',
+					],
+				},
+			}),
+		]
+		: []),
+] as const
 
 export const wagmiConfig = createConfig({
-  chains: [avalanche],
-  transports: {
-    [avalanche.id]: http(RPC_URL, {
-      batch: true,
-      retryCount: 3,
-      retryDelay: 900,
-    }),
-  },
-  connectors: [
-    // Descubre Core/Phantom/Rabby/Brave/etc. vía injected
-    injected({ shimDisconnect: true }),
-
-    // MetaMask (maneja variantes especiales)
-    metaMask({ dappMetadata: { name: "Burrito Private Funding" } }),
-
-    // Coinbase Wallet
-    coinbaseWallet({
-      appName: "Burrito Private Funding",
-      jsonRpcUrl: RPC_URL,
-    }),
-
-    // WalletConnect siempre presente (requerido para iframe)
-    walletConnect({
-      projectId: WC_PROJECT_ID || "demo", // "demo" solo para DEV local
-      showQrModal: true,
-      metadata: {
-        name: "Burrito Private Funding",
-        description: "Private funding on Avalanche (eERC Converter)",
-        url:
-          typeof window !== "undefined"
-            ? window.location.origin
-            : "https://example.org",
-        icons: [
-          "https://avatars.githubusercontent.com/u/74507509?s=200&v=4",
-        ],
-      },
-    }),
-  ],
-  ssr: true,
-});
-
-if (typeof window !== "undefined") {
-  console.log("[wagmi] config ready, connectors:",
-    (wagmiConfig.connectors ?? []).map(c => ({ id: c.id, name: c.name }))
-  );
-}
+	chains: [ avalanche ],
+	transports: {
+		[avalanche.id]: http(), // add your RPC if needed
+	},
+	multiInjectedProviderDiscovery: true,
+	ssr: true,
+	connectors,
+})
