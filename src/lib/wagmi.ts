@@ -1,48 +1,45 @@
 // src/lib/wagmi.ts
 import { createConfig, http } from 'wagmi'
 import { avalanche } from 'wagmi/chains'
-import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
+import { injected, walletConnect, coinbaseWallet } from '@wagmi/connectors'
 
 const wcProjectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID
 
-const connectors = [
-	injected({ shimDisconnect: true }),
-	coinbaseWallet({
-		appName: 'Burrito — Private Wallet',
-		appLogoUrl:
-			typeof window !== 'undefined'
-				? `${ window.location.origin }/favicon.ico`
-				: undefined,
-	}),
-	...(wcProjectId
-		? [
-			walletConnect({
-				projectId: wcProjectId,
-				showQrModal: true,
-				metadata: {
-					name: 'Burrito — Private Wallet',
-					description: 'Encrypted ERC-20 on Avalanche',
-					url:
-						typeof window !== 'undefined'
-							? window.location.origin
-							: 'https://example.org',
-					icons: [
-						typeof window !== 'undefined'
-							? `${ window.location.origin }/favicon.ico`
-							: 'https://walletconnect.com/_next/static/media/walletconnect-logo.1c6b3f2a.svg',
-					],
-				},
-			}),
-		]
-		: []),
-] as const
+// Detect client safely
+const isClient = typeof window !== 'undefined'
+
+// Build connectors ONLY on the client to avoid SSR/CJS touching ESM deps
+const buildConnectors = () => {
+  if (!isClient) return [] as const
+  const base = [
+    injected({ shimDisconnect: true }),
+    coinbaseWallet({
+      appName: 'Burrito — Private Wallet',
+      appLogoUrl: `${window.location.origin}/favicon.ico`,
+    }),
+  ]
+  return wcProjectId
+    ? [
+        ...base,
+        walletConnect({
+          projectId: wcProjectId,
+          showQrModal: true,
+          metadata: {
+            name: 'Burrito — Private Wallet',
+            description: 'Encrypted ERC-20 on Avalanche',
+            url: window.location.origin,
+            icons: [`${window.location.origin}/favicon.ico`],
+          },
+        }),
+      ]
+    : base
+}
 
 export const wagmiConfig = createConfig({
-	chains: [ avalanche ],
-	transports: {
-		[avalanche.id]: http(), // add your RPC if needed
-	},
-	multiInjectedProviderDiscovery: true,
-	ssr: true,
-	connectors,
+  chains: [avalanche],
+  transports: { [avalanche.id]: http() },
+  multiInjectedProviderDiscovery: true,
+  ssr: true,
+  // ⬇️ empty on server, real connectors on client
+  connectors: buildConnectors(),
 })
