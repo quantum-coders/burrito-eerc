@@ -23,20 +23,12 @@ import ConnectWalletBar from './ConnectWalletBar'
 import { writeContract } from 'wagmi/actions'
 import { wagmiConfig } from '../lib/wagmi'
 
-const BURRITO_TOKEN: Address = '0xf65645a42609f6b44E2EC158A3Dc2b6CfC97093f'
-const EERC_CONTRACT: Address = '0x2f1836b1a43B49CeF81B52a0C5b850d67030c020'
-
-function getCircuitConfig() {
-	const origin = typeof window !== 'undefined' ? window.location.origin : ''
-	const base = origin ? `${ origin }/eerc` : '/eerc'
-	return {
-		registration: { wasm: `${ base }/registration.wasm`, zkey: `${ base }/registration.zkey` },
-		transfer: { wasm: `${ base }/transfer.wasm`, zkey: `${ base }/transfer.zkey` },
-		withdraw: { wasm: `${ base }/withdraw.wasm`, zkey: `${ base }/withdraw.zkey` },
-		mint: { wasm: `${ base }/mint.wasm`, zkey: `${ base }/mint.zkey` },
-		burn: { wasm: `${ base }/burn.wasm`, zkey: `${ base }/burn.zkey` },
-	} as const
-}
+// ✅ Use the centralized config/addresses only (avoid duplicates)
+import {
+	BURRITO_TOKEN,
+	EERC_CONTRACT,
+	getCircuitConfig as getCircuitConfigFromLib,
+} from '../lib/eerc'
 
 const ERC20_DECIMALS_ABI = [
 	{ type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [ { type: 'uint8' } ] },
@@ -60,7 +52,13 @@ const ERC20_APPROVE_ABI = [
 ] as const
 
 export default function BurritoPrivateFunding() {
-	const circuits = getCircuitConfig()
+	// Circuits from lib + defensive alias for the SDK
+	const circuits = useMemo(() => {
+		const cfg = getCircuitConfigFromLib() as any
+		cfg.register = cfg.register || cfg.registration
+		console.log('[BPF] circuits.register', cfg.register)
+		return cfg
+	}, [])
 
 	const { address, isConnected, isConnecting } = useAccount()
 	const chainId = useChainId()
@@ -117,6 +115,7 @@ export default function BurritoPrivateFunding() {
 		[ decryptedBalance, eercDecimals ]
 	)
 
+	// Resolve ERC‑20 decimals
 	useEffect(() => {
 		;(async () => {
 			if (!publicClient) return
@@ -134,6 +133,7 @@ export default function BurritoPrivateFunding() {
 		})()
 	}, [ publicClient ])
 
+	// Auto refresh when key + registration are ready
 	const ready = isConnected && isDecryptionKeySet && isRegistered
 	const wasReadyRef = useRef(false)
 	useEffect(() => {
@@ -143,11 +143,13 @@ export default function BurritoPrivateFunding() {
 			try {
 				await refetchBalance()
 			} catch {
+				/* noop */
 			}
 		})()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ ready ])
 
+	// Connection debug
 	useEffect(() => {
 		console.log('🌯 Burrito Debug:', {
 			isConnected,
@@ -158,6 +160,7 @@ export default function BurritoPrivateFunding() {
 		})
 	}, [ isConnected, address, chainId, walletClient, isConnecting ])
 
+	// Auto-switch to Avalanche
 	useEffect(() => {
 		if (isConnected && chainId !== avalanche.id) {
 			switchChain({ chainId: avalanche.id })
@@ -175,6 +178,7 @@ export default function BurritoPrivateFunding() {
 		}
 	}, [ chainId, switchChain ])
 
+	// Ensure ERC‑20 allowance (fixes "insufficient approval")
 	const ensureAllowance = useCallback(
 		async (owner: Address, spender: Address, amount: bigint) => {
 			if (!publicClient) throw new Error('No public client')
@@ -202,16 +206,29 @@ export default function BurritoPrivateFunding() {
 			try {
 				toast.info('Sending ERC‑20 approve…')
 				const h = await sendApprove(amount)
-				toast.success(<div>Approve sent<br /><small>{ h }</small></div>)
+				toast.success(
+					<div>
+						Approve sent
+						<br />
+						<small>{ h }</small>
+					</div>
+				)
 				return { approved: true, hash: h }
 			} catch (e1) {
+				// Some tokens require approve(0) before increasing the allowance
 				try {
 					await sendApprove(0n)
 				} catch {
 					throw e1
 				}
 				const h = await sendApprove(amount)
-				toast.success(<div>Approve sent<br /><small>{ h }</small></div>)
+				toast.success(
+					<div>
+						Approve sent
+						<br />
+						<small>{ h }</small>
+					</div>
+				)
 				return { approved: true, hash: h }
 			}
 		},
@@ -237,7 +254,13 @@ export default function BurritoPrivateFunding() {
 			const ok = await ensureNetwork()
 			if (!ok) return toast.warn('Please switch to Avalanche C‑Chain')
 			const { transactionHash } = await register()
-			toast.success(<div>Registration submitted<br /><small>{ transactionHash }</small></div>)
+			toast.success(
+				<div>
+					Registration submitted
+					<br />
+					<small>{ transactionHash }</small>
+				</div>
+			)
 			setTxHash(transactionHash as `0x${ string }`)
 			await refetchBalance()
 		} catch (e) {
@@ -269,7 +292,13 @@ export default function BurritoPrivateFunding() {
 
 			const { transactionHash } = await deposit(atomic18)
 			setTxHash(transactionHash as `0x${ string }`)
-			toast.success(<div>Deposit submitted<br /><small>{ transactionHash }</small></div>)
+			toast.success(
+				<div>
+					Deposit submitted
+					<br />
+					<small>{ transactionHash }</small>
+				</div>
+			)
 			await refetchBalance()
 		} catch (e) {
 			toast.error((e as Error).message || 'Deposit failed')
@@ -277,8 +306,17 @@ export default function BurritoPrivateFunding() {
 			setIsLoading(false)
 		}
 	}, [
-		isConnected, address, amountDeposit, isDecryptionKeySet, isRegistered,
-		ensureNetwork, erc20Decimals, ensureAllowance, deposit, refetchBalance, auditorPkFromHook
+		isConnected,
+		address,
+		amountDeposit,
+		isDecryptionKeySet,
+		isRegistered,
+		ensureNetwork,
+		erc20Decimals,
+		ensureAllowance,
+		deposit,
+		refetchBalance,
+		auditorPkFromHook,
 	])
 
 	const handlePrivateTransfer = useCallback(async () => {
@@ -290,18 +328,37 @@ export default function BurritoPrivateFunding() {
 		try {
 			const ok = await ensureNetwork()
 			if (!ok) return toast.warn('Please switch to Avalanche C‑Chain')
+
+			// Recipient must be registered
 			const reg = await isAddressRegistered(toPriv as Address)
 			if (!reg?.isRegistered) return toast.error('Recipient is not registered in eERC')
 
 			const atomic = parseUnits(amountPriv, eercDecimals)
 			const { transactionHash } = await privateTransfer(toPriv as Address, atomic)
 			setTxHash(transactionHash as `0x${ string }`)
-			toast.success(<div>Private transfer sent<br /><small>{ transactionHash }</small></div>)
+			toast.success(
+				<div>
+					Private transfer sent
+					<br />
+					<small>{ transactionHash }</small>
+				</div>
+			)
 			await refetchBalance()
 		} catch (e) {
 			toast.error((e as Error).message || 'Private transfer failed')
 		}
-	}, [ isConnected, address, isDecryptionKeySet, toPriv, amountPriv, ensureNetwork, isAddressRegistered, refetchBalance, eercDecimals, privateTransfer ])
+	}, [
+		isConnected,
+		address,
+		isDecryptionKeySet,
+		toPriv,
+		amountPriv,
+		ensureNetwork,
+		isAddressRegistered,
+		refetchBalance,
+		eercDecimals,
+		privateTransfer,
+	])
 
 	const handleWithdraw = useCallback(async () => {
 		if (!isConnected || !address) return toast.error('Connect your wallet first')
@@ -311,10 +368,17 @@ export default function BurritoPrivateFunding() {
 		try {
 			const ok = await ensureNetwork()
 			if (!ok) return toast.warn('Please switch to Avalanche C‑Chain')
+
 			const atomic = parseUnits(amountWithdraw, eercDecimals)
 			const { transactionHash } = await withdraw(atomic)
 			setTxHash(transactionHash as `0x${ string }`)
-			toast.success(<div>Withdrawal sent<br /><small>{ transactionHash }</small></div>)
+			toast.success(
+				<div>
+					Withdrawal sent
+					<br />
+					<small>{ transactionHash }</small>
+				</div>
+			)
 			await refetchBalance()
 		} catch (e: unknown) {
 			const err = e as { shortMessage?: string; message?: string }
@@ -454,7 +518,9 @@ export default function BurritoPrivateFunding() {
 						<div className="bpf-alert small">Your private balance is encrypted. Generate your decryption key to view it.</div>
 					) : (
 						<>
-              <p className="bpf-balance-num"><strong>{ privTokens }</strong> e.BURRITO</p>
+              <p className="bpf-balance-num">
+                <strong>{ privTokens }</strong> e.BURRITO
+              </p>
               <div className="bpf-actions">
                 <button
 					type="button"
@@ -524,18 +590,18 @@ export default function BurritoPrivateFunding() {
 					width: 100%;
 					min-width: 320px;
 					color: var(--text);
-					background: linear-gradient(180deg, rgba(215, 93, 65, .06), rgba(240, 159, 51, .06)), var(--bg);
+					background: linear-gradient(180deg, rgba(215, 93, 65, 0.06), rgba(240, 159, 51, 0.06)), var(--bg);
 					font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
 				}
 
 				.bpf-card {
 					width: 100%;
 					max-width: 720px;
-					background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(0, 0, 0, .15)), var(--panel);
+					background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.15)), var(--panel);
 					border: 1px solid var(--border);
 					border-radius: 14px;
 					padding: 18px;
-					box-shadow: 0 8px 40px rgba(0, 0, 0, .35);
+					box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
 				}
 
 				.bpf-header {
@@ -587,8 +653,8 @@ export default function BurritoPrivateFunding() {
 					display: flex;
 					align-items: center;
 					gap: 10px;
-					background: rgba(215, 93, 65, .12);
-					border: 1px solid rgba(215, 93, 65, .35);
+					background: rgba(215, 93, 65, 0.12);
+					border: 1px solid rgba(215, 93, 65, 0.35);
 					color: #fbf7ee;
 					padding: 10px 12px;
 					border-radius: 10px;
@@ -603,14 +669,14 @@ export default function BurritoPrivateFunding() {
 
 				.bpf-grid {
 					display: grid;
-					grid-template-columns:1fr 1fr;
+					grid-template-columns: 1fr 1fr;
 					gap: 14px;
 					margin-top: 12px;
 				}
 
 				@media (max-width: 680px) {
 					.bpf-grid {
-						grid-template-columns:1fr;
+						grid-template-columns: 1fr;
 					}
 				}
 
@@ -633,7 +699,7 @@ export default function BurritoPrivateFunding() {
 					border-radius: 10px;
 					padding: 10px 12px;
 					outline: none;
-					transition: border-color .2s, box-shadow .2s;
+					transition: border-color 0.2s, box-shadow 0.2s;
 					width: 100%;
 				}
 
@@ -649,7 +715,7 @@ export default function BurritoPrivateFunding() {
 
 				.bpf-row {
 					display: grid;
-					grid-template-columns:1fr auto;
+					grid-template-columns: 1fr auto;
 					gap: 8px;
 				}
 
@@ -668,7 +734,7 @@ export default function BurritoPrivateFunding() {
 					padding: 10px 14px;
 					border-radius: 10px;
 					cursor: pointer;
-					transition: transform .06s ease, border-color .15s, background .15s;
+					transition: transform 0.06s ease, border-color 0.15s, background 0.15s;
 					font-weight: 600;
 					font-size: 13px;
 				}
@@ -679,7 +745,7 @@ export default function BurritoPrivateFunding() {
 				}
 
 				.bpf-btn:disabled {
-					opacity: .6;
+					opacity: 0.6;
 					cursor: not-allowed;
 				}
 
@@ -705,7 +771,8 @@ export default function BurritoPrivateFunding() {
 					margin: 16px 0;
 				}
 
-				.bpf-balance h3, section h4 {
+				.bpf-balance h3,
+				section h4 {
 					margin: 0 0 8px;
 					font-size: 14px;
 					color: #fbf7ee;

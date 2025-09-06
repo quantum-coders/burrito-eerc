@@ -174,18 +174,18 @@ export default function WalletModalRoot() {
   const getIconPath = (id: string, name: string): { src?: string; fallback: string; hint: string } => {
     const n = name.toLowerCase()
     if (id === 'walletConnect' || n.includes('walletconnect')) {
-      return { src: '/icons/wallets/walletconnect.svg', fallback: '🔗', hint: 'Mobile & Desktop (QR)' }
+      return { src: '/icons/wallet/walletconnect.svg', fallback: '🔗', hint: 'Mobile & Desktop (QR)' }
     }
     if (id === 'coinbaseWallet' || n.includes('coinbase')) {
-      return { src: '/icons/wallets/coinbase.svg', fallback: '🔵', hint: 'Coinbase Wallet' }
+      return { src: '/icons/wallet/coinbase.svg', fallback: '🔵', hint: 'Coinbase Wallet' }
     }
     if (n.includes('metamask')) {
-      return { src: '/icons/wallets/metamask.svg', fallback: '🦊', hint: 'Injected (browser)' }
+      return { src: '/icons/wallet/metamask.svg', fallback: '🦊', hint: 'Injected (browser)' }
     }
     if (id === 'injected') {
-      return { src: '/icons/wallets/injected.svg', fallback: '🧩', hint: 'Injected (browser)' }
+      return { src: '/icons/wallet/injected.svg', fallback: '🧩', hint: 'Injected (browser)' }
     }
-    return { src: '/icons/wallets/injected.svg', fallback: '💼', hint: 'Wallet' }
+    return { src: '/icons/wallet/injected.svg', fallback: '💼', hint: 'Wallet' }
   }
 
   const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -288,7 +288,7 @@ export default function WalletModalRoot() {
               <div className="cta">
                 <div className="ctaL">
                   <div className="iconWrap">
-                    <img src="/icons/wallets/metamask.svg" alt="" onError={onImgError} />
+                    <img src="/icons/wallet/metamask.svg" alt="" onError={onImgError} />
                     <span className="fallbackEmoji" style={{ display: 'none' }}>🦊</span>
                   </div>
                   <div>
